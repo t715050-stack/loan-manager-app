@@ -58,21 +58,12 @@ const calculateNextDueDate = (customer) => {
   const { frequencyType, frequencyValue, lastPaidDate, loanStartDate } = customer;
   
   let baseDate; 
-  // 判斷是否為「本金分期」且「首次繳款」的嚴格起始模式
-  let isStrictStart = false; 
-
   if (lastPaidDate) {
     baseDate = createLocalDate(lastPaidDate);
   } else {
-    // 新合約：以借款日為基準
     baseDate = createLocalDate(loanStartDate);
-    
-    // **修正邏輯：僅針對「本金分期」的新合約，設定為嚴格起始**
-    if (customer.paymentType === 'fixed_installment') {
-        isStrictStart = true;
-    }
-    
-    if (!baseDate) baseDate = new Date(0);
+    if (baseDate) baseDate.setDate(baseDate.getDate() - 1);
+    else baseDate = new Date(0);
   }
   
   baseDate.setHours(0, 0, 0, 0); 
@@ -91,7 +82,6 @@ const calculateNextDueDate = (customer) => {
     let currentYear = baseDate.getFullYear();
     let currentMonth = baseDate.getMonth(); 
 
-    // 檢查從 baseDate 所在的月份開始，找到第一個晚於或等於 baseDate 的繳款日
     for (let i = 0; i < 12; i++) {
         const daysInMonth = getDaysInMonth(currentYear, currentMonth);
         for (let day of targetDays) {
@@ -99,21 +89,7 @@ const calculateNextDueDate = (customer) => {
             const candidateDate = new Date(currentYear, currentMonth, actualDay);
             candidateDate.setHours(0, 0, 0, 0);
 
-            // 判斷應繳日是否滿足條件
-            const isAfterBase = candidateDate.getTime() > baseDate.getTime();
-            const isSameAsBase = candidateDate.getTime() === baseDate.getTime();
-            
-            let checkCondition;
-            if (isStrictStart) {
-                // 嚴格模式 (本金分期新約)：必須嚴格在基準日之後
-                checkCondition = isAfterBase;
-            } else {
-                // 一般模式 (已繳款或非分期新約)：允許在基準日或之後
-                checkCondition = isAfterBase || isSameAsBase;
-            }
-            
-
-            if (checkCondition) {
+            if (candidateDate.getTime() > baseDate.getTime()) {
                 if (candidateDate < nextDueDate) {
                     nextDueDate = candidateDate;
                     found = true;
@@ -134,10 +110,7 @@ const calculateNextDueDate = (customer) => {
     if (isNaN(targetDayOfWeek)) targetDayOfWeek = 5; 
     
     let searchDate = new Date(baseDate);
-    // 嚴格模式下，從基準日隔天開始找；否則從基準日當天開始找 (允許基準日即為應繳日)
-    if (isStrictStart) {
-        searchDate.setDate(searchDate.getDate() + 1); 
-    }
+    searchDate.setDate(searchDate.getDate() + 1); 
 
     for (let i = 0; i < 7; i++) { 
         if (searchDate.getDay() === targetDayOfWeek) {
@@ -152,7 +125,6 @@ const calculateNextDueDate = (customer) => {
     const freqVal = parseInt(val) || 10; 
     
     let candidate = new Date(baseDate);
-    // 間隔天數模式：總是在基準日加上間隔天數，這本身就是一個「嚴格之後」的日期。
     candidate.setDate(candidate.getDate() + freqVal);
     nextDueDate = candidate;
     found = true;
@@ -980,3 +952,4 @@ export default function App() {
     </div>
   );
 }
+ 
